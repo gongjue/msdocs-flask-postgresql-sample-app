@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Restaurant List{% endblock %}
+{% block title %}Credential List{% endblock %}
 {% block head %}
     {{ super() }}
     <style>
@@ -40,33 +40,65 @@
       }
   </style>
 {% endblock %}
+
+<!-- <script>
+
+  new gridjs.Grid({
+    columns: ['Name', 'Type', 'Details'],
+    server: {
+      url: '/api/credential',
+      then: results => results.data.map(credential => [
+        credential.credential_name,
+        credential.credential_type,
+        credential.credential_provider
+      ]),
+      total: results => results.total,
+    },
+    search: {
+      enabled: true,
+      server: {
+        url: (prev, keyword) => `${prev}?search=${keyword}`
+      },
+    },
+    sort: {
+      enabled: true,
+      multiColumn: true,
+      server: {
+        url: (prev, columns) => {
+          const columnIds = ['credential_name', 'credential_type', 'credential_provider'];
+          const sort = columns.map(col => (col.direction === 1 ? '+' : '-') + columnIds[col.index]);
+          return updateUrl(prev, {sort});
+        },
+      },
+    },
+    pagination: {
+      enabled: true,
+      server: {
+        url: (prev, page, limit) => `${prev}?limit=${limit}&offset=${page * limit}`,
+      },
+    },
+  }).render(document.getElementById('credential-listing'));
+</script> -->
+
 {% block content %}
-      <h1>Restaurants</h1>
+      <h1>Credentials</h1>
 
-      {% if True %}
-          <table class="table">
-              <thead>
+      <table id="credential-listing" class="table table-striped">
+          <thead>
+              <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Details</th>
+              </tr>
+          </thead>
+          <tbody>
+              {% for credential in credentials %}
                   <tr>
-                      <th>Name</th>
-                      <th>Rating</th>
-                      <th class="text-end">Details</th>
+                      <td>{{ credential.name }}</td>
+                      <td>{{ credential.type }}</td>
+                      <td class="text-end"><a href="{{ url_for('credential_details', id=credential.id) }}" class="btn btn-sm btn-primary">Details</a></td>
                   </tr>
-              </thead>
-              <tbody>
-                  {% for restaurant in restaurants %}
-                      <tr>
-                          <td>{{ restaurant.name }}</td>
-                          <td>{% include "star_rating.html" %}</td>
-                          <td class="text-end"><a href="{{ url_for('details', id=restaurant.id) }}" class="btn btn-sm btn-primary">Details</a></td>
-                      </tr>
-                  {% endfor %}
-              </tbody>
-          </table>
-      {% else %}
-          <p>No restaurants exist.  Select Add new restaurant to add one.</p>
-      {% endif %}
-
-      <div class="d-flex justify-content-end">
-              <a href="{{ url_for('create_restaurant') }}" class="btn btn-success px-4 gap-3">Add new restaurant</a>
-      </div>
+              {% endfor %}
+          </tbody>
+      </table>
 {% endblock %}

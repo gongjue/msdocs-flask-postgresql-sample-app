@@ -5,10 +5,20 @@ from flask import Flask, redirect, render_template, request, send_from_directory
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
-
+# from jinja2 import Environment
 
 app = Flask(__name__, static_folder='static')
 csrf = CSRFProtect(app)
+
+# def provider_format(value):
+#     value_1 = value.replace("-", " - ")
+#     tokens = value_1.split(" ")
+#     skip_words = ["of", "in", "for"]
+#     tokens_cap = [s.capitalize() for s in tokens if s not in skip_words]
+#     return " ".join(tokens_cap).replace(" - ", "-")
+
+# env = Environment()
+# env.filters['provider_format'] = provider_format
 
 # WEBSITE_HOSTNAME exists only in production environment
 if 'WEBSITE_HOSTNAME' not in os.environ:
@@ -32,92 +42,91 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 # The import must be done after db initialization due to circular import issue
-from models import Restaurant, Review
+from models import Credential, Program, JobRole, CredentialJobRole
 
 @app.route('/', methods=['GET'])
 def index():
     print('Request for index page received')
-    restaurants = Restaurant.query.all()
-    return render_template('index.html', restaurants=restaurants)
+    credentials = Credential.query.all()
+    return render_template('index.html', credentials=credentials)
 
-@app.route('/<int:id>', methods=['GET'])
-def details(id):
-    restaurant = Restaurant.query.where(Restaurant.id == id).first()
-    reviews = Review.query.where(Review.restaurant == id)
-    return render_template('details.html', restaurant=restaurant, reviews=reviews)
+@app.route('/credential/<string:id>', methods=['GET'])
+def credential_details(id):
+    credential = Credential.query.where(Credential.id == id).first()
+    programs = Program.query.where(Program.credential_uuid == id)
+    job_roles = JobRole.query.join(
+        CredentialJobRole, JobRole.id == CredentialJobRole.job_role_id).where(
+        CredentialJobRole.credential_uuid == id)
+    # programs = None
+    print(programs.count())
+    return render_template('credential_details.html',
+                           credential=credential,
+                           programs=programs,
+                           job_roles=job_roles)
 
-@app.route('/create', methods=['GET'])
-def create_restaurant():
-    print('Request for add restaurant page received')
-    return render_template('create_restaurant.html')
+@app.route('/program/<string:id>', methods=['GET'])
+def program_details(id):
+    program = Program.query.where(Program.id == id).first()
+    return render_template('program_details.html', program=program)
 
-@app.route('/add', methods=['POST'])
-@csrf.exempt
-def add_restaurant():
-    try:
-        name = request.values.get('restaurant_name')
-        street_address = request.values.get('street_address')
-        description = request.values.get('description')
-    except (KeyError):
-        # Redisplay the question voting form.
-        return render_template('add_restaurant.html', {
-            'error_message': "You must include a restaurant name, address, and description",
-        })
-    else:
-        restaurant = Restaurant()
-        restaurant.name = name
-        restaurant.street_address = street_address
-        restaurant.description = description
-        db.session.add(restaurant)
-        db.session.commit()
-
-        return redirect(url_for('details', id=restaurant.id))
-
-@app.route('/review/<int:id>', methods=['POST'])
-@csrf.exempt
-def add_review(id):
-    try:
-        user_name = request.values.get('user_name')
-        rating = request.values.get('rating')
-        review_text = request.values.get('review_text')
-    except (KeyError):
-        #Redisplay the question voting form.
-        return render_template('add_review.html', {
-            'error_message': "Error adding review",
-        })
-    else:
-        review = Review()
-        review.restaurant = id
-        review.review_date = datetime.now()
-        review.user_name = user_name
-        review.rating = int(rating)
-        review.review_text = review_text
-        db.session.add(review)
-        db.session.commit()
-
-    return redirect(url_for('details', id=id))
-
-@app.context_processor
-def utility_processor():
-    def star_rating(id):
-        reviews = Review.query.where(Review.restaurant == id)
-
-        ratings = []
-        review_count = 0
-        for review in reviews:
-            ratings += [review.rating]
-            review_count += 1
-
-        avg_rating = sum(ratings) / len(ratings) if ratings else 0
-        stars_percent = round((avg_rating / 5.0) * 100) if review_count > 0 else 0
-        return {'avg_rating': avg_rating, 'review_count': review_count, 'stars_percent': stars_percent}
-
-    return dict(star_rating=star_rating)
+@app.route('/job_role/<string:id>', methods=['GET'])
+def job_role_details(id):
+    job_role = JobRole.query.where(JobRole.id == id).first()
+    credentials = Credential.query.join(
+        CredentialJobRole, Credential.id == CredentialJobRole.credential_uuid).where(
+        CredentialJobRole.job_role_id == id)
+    return render_template('job_role_details.html', job_role=job_role, credentials=credentials)
 
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'),
                                'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
+
+@app.route('/api/credential', methods=['GET'])
+def data():
+    query = Credential.query
+
+    # search filter
+    search = request.args.get('search[value]')
+    if search:
+        query = query.filter(db.or_(
+            Credential.credential_name.like(f'%{search}%'),
+        ))
+    total_filtered = query.count()
+
+    # sorting
+    order = []
+    i = 0
+    while True:
+        col_index = request.args.get(f'order[{i}][column]')
+        if col_index is None:
+            break
+        col_name = request.args.get(f'columns[{col_index}][data]')
+        if col_name not in ['credential_name', 'credential_type']:
+            col_name = 'credential_name'
+        descending = request.args.get(f'order[{i}][dir]') == 'desc'
+        col = getattr(Credential, col_name)
+        if descending:
+            col = col.desc()
+        order.append(col)
+        i += 1
+    if order:
+        query = query.order_by(*order)
+
+    # pagination
+    start = request.args.get('start', type=int)
+    length = request.args.get('length', type=int)
+    query = query.offset(start).limit(length)
+
+    # response
+    return {
+        'data': [credential.to_dict() for credential in query],
+        'recordsFiltered': total_filtered,
+        'recordsTotal': Credential.query.count(),
+        'draw': request.args.get('draw', type=int),
+    }
+
 
 if __name__ == '__main__':
     app.run()

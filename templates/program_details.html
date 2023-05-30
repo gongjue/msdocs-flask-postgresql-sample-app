@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Program Details{% endblock %}
+{% block head %}
+    {{ super() }}
+    <style>
+      body {
+          min-height: 75rem;
+          padding-top: 4.5rem;
+      }
+  </style>
+{% endblock %}
+{% block content %}
+  <h1>{{ program.name }}</h1> 
+  <div class="row">
+      <div class="col-md-2 fw-bold">Provider:</div>
+      <div class="col">{{ program.provider }}</div>
+  </div>
+  <div class="row">
+      <div class="col-md-2 fw-bold">Delivery methods:</div>
+      <div class="col">{{ program.delivery_method }}</div>                
+  </div>
+  <div class="row">
+      <div class="col-md-2 fw-bold">Duration:</div>
+      <div class="col">{{ program.duration }} months</div>                
+  </div>
+  <div class="row">
+      <div class="col-md-2 fw-bold">Price:</div>
+      <div class="col">${{ program.price }}</div>                
+  </div>
+  <div class="row">
+      <div class="col-md-2 fw-bold">Location:</div>
+      <div class="col">{{ program.location }}</div>                
+  </div>
+
+
+{% endblock %}
